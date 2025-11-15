@@ -4,24 +4,30 @@
 MAX_ATTEMPTS     EQU 15
 WORD_LEN         EQU 5
 PROMPT_ROW       EQU 2        ; Movido más arriba para dar más espacio
-INPUT_ROW        EQU 20       ; Movido más abajo para dar más espacio al historial
-HISTORY_BASE_ROW EQU 17       ; Fila más baja del historial (palabras nuevas aquí)
+INPUT_ROW        EQU 4       ; Movido más abajo para dar más espacio al historial
+HISTORY_BASE_ROW EQU INPUT_ROW + 3       ; Fila más baja del historial (palabras nuevas aquí)
 PROMPT_HINT_ROW  EQU PROMPT_ROW + 2
 
+;int 80h -> calcular columna central (CalculateCenteredColumn)
+;int 60h -> limpiar pantalla (ClearScreenAttr)
+
 extrn SetVideoModeText:near
-extrn ClearScreenAttr:near
 extrn PrintDollarStringAt:near
 extrn PrintCenteredDollarString:near
 extrn DrawGuessSlots:near
 extrn ReadWord:near
 extrn EvaluateGuess:near
 extrn RenderGuessRow:near
-extrn CalculateCenteredColumn:near
 extrn DrawBigText:near
+extrn r2a:near
+extrn ClearStringAt:near
+extrn ClearCenteredDollarString:near
 
 .data
 welcomeTitle        db 'Wordly$'
 welcomePrompt       db 'Presiona Enter para comenzar$'
+continuePrompt      db 'Presiona Enter para continuar$'
+attemptsPrompt      db 'Intentos restantes: $' 
 promptText          db 'Ingresa tu palabra para adivinar la escondida:$'
 promptHint          db '         $'
 successMsg          db 'Felicitaciones! Adivinaste la palabra.$'
@@ -32,6 +38,7 @@ guessBuffer         db WORD_LEN dup (0)
 statusBuffer        db WORD_LEN dup (0)
 historyWords        db MAX_ATTEMPTS * WORD_LEN dup (0)
 historyStatuses     db MAX_ATTEMPTS * WORD_LEN dup (0)
+attemptsLeft        db '00$'
 attemptCount        db 0
 
 .code
@@ -42,7 +49,7 @@ start:
 
     call SetVideoModeText
     mov al, 07h
-    call ClearScreenAttr
+    int 60h
 
     ; Mostrar pantalla de bienvenida con título grande
     mov bh, 8               ; Fila para el título grande (5 filas de altura)
@@ -63,7 +70,7 @@ WaitForEnter:
 
     ; Limpiar pantalla y comenzar el juego
     mov al, 07h
-    call ClearScreenAttr
+    int 60h
 
     lea si, promptText
     mov bh, PROMPT_ROW
@@ -76,13 +83,36 @@ WaitForEnter:
     call PrintCenteredDollarString
 
 GameLoop:
-    call CalculateCenteredColumn
+    ;calcular intentos restantes
+    mov al, MAX_ATTEMPTS
+    sub al, attemptCount
+    mov dx, offset attemptsLeft
+    call r2a
+    ;imprimir contador de intentos restantes
+    lea si, attemptsPrompt
+    mov bh, 1
+    mov ah, 0Fh
+    call PrintCenteredDollarString
+
+    lea si, attemptsLeft
+    mov bh, 1
+    mov bl, 50
+    mov ah, 0Fh
+    call PrintDollarStringAt
+    ;lea si, failMsg
+    ;mov bh, 21
+    ;mov bl columna
+    ;mov ah, 0Fh
+    ;call PrintCenteredDollarString
+
+
+    int 80h
     mov bl, al              ; Columna centrada en BL
     mov bh, INPUT_ROW
     mov ah, 0Fh
     call DrawGuessSlots
 
-    call CalculateCenteredColumn
+    int 80h
     mov dl, al              ; Columna centrada en DL
     lea bx, guessBuffer
     mov dh, INPUT_ROW
@@ -149,10 +179,10 @@ RenderHistoryLoop:
     mov bl, 3
     mul bl              ; Cada recuadro ocupa 3 filas
     mov dh, HISTORY_BASE_ROW
-    sub dh, al          ; Restar para que las nuevas estén abajo
+    add dh, al          ; Restar para que las nuevas estén abajo
     pop bx              ; Restaurar índice
     
-    call CalculateCenteredColumn
+    int 80h
     mov dl, al
     call RenderGuessRow
     
@@ -179,21 +209,130 @@ NotWin:
 
 GameOver:
     lea si, failMsg
-    mov bh, 22
+    mov bh, 21
     mov ah, 0Fh
     call PrintCenteredDollarString
 
     lea si, targetWordDisplay
-    mov bh, 23
+    mov bh, 22
     mov ah, 2Fh
     call PrintCenteredDollarString
-    jmp GameEnd
+
+    lea si, continuePrompt
+    mov bh, 23
+    mov ah, 0Fh
+    call PrintCenteredDollarString
+
+    ;limpio la cadena de intentos restantes
+    mov bh, 1
+    mov ah, 07h
+    lea si, attemptsPrompt
+    call ClearCenteredDollarString
+
+    mov bh, 1
+    mov bl, 50
+    mov ah, 07h
+    lea si, attemptsLeft
+    call ClearStringAt
+
+
+    ; --- Resetear estado del juego ---
+    ; Poner attemptCount = 0
+    mov byte ptr [attemptCount], 0
+
+    ;resetear historial
+    push ds
+    pop es
+
+    ; Borrar historyWords 
+    lea di, historyWords
+    mov cx, MAX_ATTEMPTS * WORD_LEN
+    xor al, al
+    rep stosb
+
+    ; Borrar historyStatuses 
+    lea di, historyStatuses
+    mov cx, MAX_ATTEMPTS * WORD_LEN
+    xor al, al
+    rep stosb
+
+    ; Limpiar buffer de entrada (guessBuffer)
+    push ds
+    pop es
+    lea di, guessBuffer
+    mov cx, WORD_LEN
+    xor al, al
+    rep stosb
+
+    ; Limpiar statusBuffer (por las dudas)
+    lea di, statusBuffer
+    mov cx, WORD_LEN
+    xor al, al
+    rep stosb
+
+    ;llamar a funcion que elige una nueva palabra random
+
+    jmp WaitForEnter
 
 HandleWin:
     lea si, successMsg
     mov bh, 22
     mov ah, 0Fh
     call PrintCenteredDollarString
+
+    lea si, continuePrompt
+    mov bh, 23
+    mov ah, 0Fh
+    call PrintCenteredDollarString
+
+    ;limpio la cadena de intentos restantes
+    mov bh, 1
+    mov ah, 07h
+    lea si, attemptsPrompt
+    call ClearCenteredDollarString
+
+    mov bh, 1
+    mov bl, 50
+    mov ah, 07h
+    lea si, attemptsLeft
+    call ClearStringAt
+
+    ;resetear estado del juego
+    mov byte ptr [attemptCount], 0
+
+    ;resetear historial
+    push ds
+    pop es
+
+    ; Borrar historyWords 
+    lea di, historyWords
+    mov cx, MAX_ATTEMPTS * WORD_LEN
+    xor al, al
+    rep stosb
+
+    ; Borrar historyStatuses 
+    lea di, historyStatuses
+    mov cx, MAX_ATTEMPTS * WORD_LEN
+    xor al, al
+    rep stosb
+
+    ; Limpiar buffer de entrada (guessBuffer)
+    push ds
+    pop es
+    lea di, guessBuffer
+    mov cx, WORD_LEN
+    xor al, al
+    rep stosb
+
+    ; Limpiar statusBuffer (por las dudas)
+    lea di, statusBuffer
+    mov cx, WORD_LEN
+    xor al, al
+    rep stosb
+
+    ;llamar a funcion que elige una nueva palabra random
+
+    jmp WaitForEnter
 
 GameEnd:
     xor ax, ax
