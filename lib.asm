@@ -14,6 +14,7 @@ box_char_bot_l      db 192      ; └ (esquina inferior izquierda redondeada)
 box_char_bot_r      db 217      ; ┘ (esquina inferior derecha redondeada)
 box_char_horiz      db 196      ; ─ (línea horizontal simple)
 box_char_vert       db 179      ; │ (línea vertical simple)
+dataDiv             db 10, 1
 
 ; Arte ASCII para letras grandes estilo contorno (5x11 cada una, 55 bytes)
 ; Usando _, -, | para crear solo los bordes/contornos
@@ -30,39 +31,90 @@ GREEN_ATTR  EQU 2Fh
 YELLOW_ATTR EQU 6Fh
 BASE_ATTR   EQU 0Fh
 
+public ClearStringAt
 public SetVideoModeText
-public ClearScreenAttr
 public PrintDollarStringAt
 public PrintCenteredDollarString
+public ClearCenteredDollarString
 public DrawGuessSlots
 public ReadWord
 public EvaluateGuess
 public RenderGuessRow
-public CalculateCenteredColumn
 public DrawBigText
+public r2a
+
+
+ClearCenteredDollarString proc near
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+
+    ; Guardar BH y AH en DL/DH
+    mov dh, ah
+    mov dl, bh
+
+    ; Guardar puntero original en BX y contar longitud en CX
+    mov bx, si       ; BX <- puntero original
+    xor cx, cx
+
+CountLooop:
+    mov al, [si]     ; leer byte en SI sin usar LODSB (más controlable)
+    cmp al, '$'
+    je CountDone
+    inc cx
+    inc si
+    jmp CountLooop
+
+CountDone:
+    mov si, bx       ; restaurar puntero original en SI
+
+    ; Calcular columna inicial: (80 - longitud) / 2
+    mov ax, 50h      ; 0x50 = 80 columnas
+    sub ax, cx
+    shr ax, 1
+    mov bl, al       ; BL = columna inicial
+
+    ; Restaurar BH y AH desde DL/DH
+    mov bh, dl
+    mov ah, dh
+
+    ; Llamar a la rutina que imprime espacios por cada carácter ($-terminated)
+    call ClearStringAt
+
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+ClearCenteredDollarString endp
+
+
+ClearStringAt proc near
+    ; entrada:
+    ;  SI = dirección del string con '$'
+    ;  BH = fila
+    ;  BL = columna
+    ;  AH = atributo
+NextClear:
+    lodsb
+    cmp al, '$'
+    je EndClear
+    mov al, ' '        ; convertir cualquier carácter en espacio
+    call WriteCharAttr
+    inc bl
+    jmp NextClear
+EndClear:
+    ret
+ClearStringAt endp
 
 SetVideoModeText proc near
     mov ax, 0003h
     int 10h
     ret
 SetVideoModeText endp
-
-ClearScreenAttr proc near
-    push bx
-    push cx
-    push dx
-
-    mov bh, al
-    mov ax, 0600h
-    xor cx, cx
-    mov dx, 184Fh
-    int 10h
-
-    pop dx
-    pop cx
-    pop bx
-    ret
-ClearScreenAttr endp
 
 WriteCharAttr proc near
     push bx
@@ -492,31 +544,6 @@ AttrReady:
     ret
 RenderGuessRow endp
 
-CalculateCenteredColumn proc near
-    ; Calcula la columna centrada para los recuadros
-    ; Cada recuadro ocupa 5 caracteres + 1 espacio = 6 caracteres
-    ; 5 recuadros × 6 = 30, pero el último no tiene espacio = 29 caracteres totales
-    ; Retorna en AL la columna inicial centrada
-    push bx
-    push cx
-    
-    ; Ancho total: 5 recuadros × 6 caracteres - 1 espacio del último = 29
-    mov al, 5           ; Número de recuadros
-    mov bl, 6           ; Ancho por recuadro (5 caracteres + 1 espacio)
-    mul bl              ; AX = 5 × 6 = 30
-    sub ax, 1           ; Restar 1 espacio del último recuadro = 29
-    
-    ; Calcular columna centrada: (80 - 29) / 2
-    mov bl, 50h         ; 80 columnas (50h)
-    sub bl, al          ; 80 - 29 = 51
-    mov al, bl
-    shr al, 1           ; Dividir por 2 = 25 (redondeado hacia abajo)
-    
-    pop cx
-    pop bx
-    ret
-CalculateCenteredColumn endp
-
 DrawBigText proc near
     ; Dibuja el título completo desde bigW de una vez
     ; bigW contiene el título completo con 0dh,0ah al final de cada fila
@@ -625,6 +652,50 @@ DrawLetterCol:
     pop ax
     ret
 DrawBigLetter endp
+
+r2a proc
+    ;recibe en al el numero a convertir
+    ;recibe en dx el offset de la variable en la que escribe el ascii
+    ;en dx queda guardado el offset de la variable para despues llamar al serivio 9
+    push ax
+    push cx
+    push bx
+    push dx
+    push si
+
+    ;limpiar variable ascii
+    mov cx, 2
+    mov bx, dx
+limpiar:
+    mov byte ptr[bx], 30h
+    inc bx
+    loop limpiar
+
+
+    mov ah, 0
+    mov cx, 2
+    mov bx, dx
+    mov si, 0
+reg2ascc:
+    mov dl, dataDiv[si]
+    div dl
+    add [bx], al
+    mov al, ah
+    mov ah, 0
+    inc bx
+    inc si
+loop reg2ascc
+
+    pop si
+    pop dx
+    pop bx
+    pop cx
+    pop ax
+    
+
+
+ret
+r2a endp
 
 end
 
