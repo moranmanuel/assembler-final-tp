@@ -15,6 +15,11 @@ box_char_bot_r      db 217      ; ┘ (esquina inferior derecha redondeada)
 box_char_horiz      db 196      ; ─ (línea horizontal simple)
 box_char_vert       db 179      ; │ (línea vertical simple)
 dataDiv             db 10, 1
+words               db ' CASCO DEDAL JARRA PERRO GATOS PASTO LIBRO CARNE FUEGO METAL PUNTO TORRE PLAYA CAMPO NUBES RATON PERLA FANGO TAZAS VASOS BOLSA LENTE '
+                    db 'TECLA NARIZ CEJAS LABIO PELOS HUESO ROSTO BARBA BOTAS RUEDA MOTOR TUBOS CABLE VELAS NAVIO HORNO RADIO CELDA FOCO SILLA MESA BANCO '
+                    db 'CAJON PARED TECHO PUERTA SUELO MOLDE TROPA GRUPO FLETE BARCO AVION FICHA DADOS CARTA FONDO LUCES PERNO CLAVO TAPON MARCO GRANO FRUTA '
+                    db 'PANES TAZON JUEGO CUERO PULSO GENIO HABLA RITMO PASOS RAMAS HOJAS TINTA LLAVE COSTA RISCO ARENA TRIGO HUEVO PUNTA GARRA ROCA SUENO '
+
 
 ; Arte ASCII para letras grandes estilo contorno (5x11 cada una, 55 bytes)
 ; Usando _, -, | para crear solo los bordes/contornos
@@ -42,7 +47,83 @@ public EvaluateGuess
 public RenderGuessRow
 public DrawBigText
 public r2a
+public PickRandomWord
 
+PickRandomWord proc near
+
+    push ax
+    push bx
+    ;devuelve en cx el largo de la palabra para despues cuando hagamos palabras con distintos largos
+    call Random1to100
+
+    ;eln ax tenog el num del 1 al 100
+    ;bucle que recorre palaras y cada vez q encuentra un espacio aumenta en 1
+    ;recibe en di offset palabra a adivinar
+    ;recibe en si offset variable targetWordDisplay
+    ;devuelve en cx cantidad de caracteres de la palabra
+    
+    lea bx, words
+    mov cx, 0
+recorrerWords:
+    cmp byte ptr[bx], 20h
+    je isSpace
+    inc bx
+    jmp recorrerWords
+    isSpace:
+    inc cx
+    cmp cx, ax
+    je isWord
+    inc bx
+    jmp recorrerWords
+
+isWord: ;copiar la palabra en la variable de destino
+    mov cx, 0
+isWordLoop:
+    inc bx
+    cmp byte ptr[bx], 20h
+    je endCopy
+    mov al, [bx]    ;muevo a al el caracter
+    mov [di], al  ;lo guardo en la variable   
+    mov [si], al
+    inc cx
+    inc di
+    inc si
+    jmp isWordLoop
+
+endCopy:
+
+    pop bx
+    pop ax
+    ret
+
+PickRandomWord endp
+
+Random1to100 proc near
+    push dx
+    push cx
+
+    ; Leer timer BIOS (ticks desde medianoche)
+    mov ah, 00h
+    int 1Ah          ; CX:DX = ticks
+
+    mov ax, dx       ; usamos DX como random base
+
+    ; Mezclar un toque (simple shuffle)
+    xor ax, cx
+    add ax, dx
+
+    ; Hacer modulo 100
+    mov bx, 100
+    xor dx, dx       ; limpiar DX para div
+    div bx           ; AX = AX / 100, DX = resto (0–99)
+
+    mov ax, dx       ; número 0 a 99
+    inc ax           ; ahora 1 a 100
+
+    pop cx
+    pop dx
+    ret
+Random1to100 endp
 
 ClearCenteredDollarString proc near
     push ax

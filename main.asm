@@ -8,8 +8,8 @@ INPUT_ROW        EQU 4       ; Movido más abajo para dar más espacio al histor
 HISTORY_BASE_ROW EQU INPUT_ROW + 3       ; Fila más baja del historial (palabras nuevas aquí)
 PROMPT_HINT_ROW  EQU PROMPT_ROW + 2
 
-;int 80h -> calcular columna central (CalculateCenteredColumn)
-;int 60h -> limpiar pantalla (ClearScreenAttr)
+;int 80h -> calcular columna central (CalculateCenteredColumn) (en al -> largo de la palabra)
+;int 60h -> limpiar pantalla (ClearScreenAttr) (al -> 07h)
 
 extrn SetVideoModeText:near
 extrn PrintDollarStringAt:near
@@ -22,6 +22,7 @@ extrn DrawBigText:near
 extrn r2a:near
 extrn ClearStringAt:near
 extrn ClearCenteredDollarString:near
+extrn PickRandomWord:near
 
 .data
 welcomeTitle        db 'Wordly$'
@@ -32,8 +33,8 @@ promptText          db 'Ingresa tu palabra para adivinar la escondida:$'
 promptHint          db '         $'
 successMsg          db 'Felicitaciones! Adivinaste la palabra.$'
 failMsg             db 'No acertaste. La palabra era: $'
-targetWord          db 'TORTA'
-targetWordDisplay   db 'PERLA','$'
+targetWord          db 10 dup (24h)
+targetWordDisplay   db 10 dup (24h)
 guessBuffer         db WORD_LEN dup (0)
 statusBuffer        db WORD_LEN dup (0)
 historyWords        db MAX_ATTEMPTS * WORD_LEN dup (0)
@@ -51,6 +52,10 @@ start:
     mov al, 07h
     int 60h
 
+WelcomeMenu:
+    mov al, 07h
+    int 60h
+    ;aca habria q limpiar las variables
     ; Mostrar pantalla de bienvenida con título grande
     mov bh, 8               ; Fila para el título grande (5 filas de altura)
     mov ah, 0Eh             ; Atributo: amarillo sobre negro
@@ -61,6 +66,10 @@ start:
     mov ah, 0Fh
     call PrintCenteredDollarString
 
+pickWord:
+    mov di, offset targetWord
+    mov si, offset targetWordDisplay
+    call PickRandomWord
     ; Esperar a que presione Enter
 WaitForEnter:
     xor ah, ah
@@ -213,7 +222,7 @@ GameOver:
     mov ah, 0Fh
     call PrintCenteredDollarString
 
-    lea si, targetWordDisplay
+    lea si, targetWord
     mov bh, 22
     mov ah, 2Fh
     call PrintCenteredDollarString
@@ -270,9 +279,15 @@ GameOver:
     xor al, al
     rep stosb
 
+    WaitForEnteer:
+    xor ah, ah
+    int 16h                 ; Leer tecla del teclado
+    cmp al, 0Dh             ; Verificar si es Enter (código 0Dh)
+    jne WaitForEnteer        ; Si no es Enter, seguir esperando
+
     ;llamar a funcion que elige una nueva palabra random
 
-    jmp WaitForEnter
+    jmp WelcomeMenu
 
 HandleWin:
     lea si, successMsg
@@ -330,9 +345,15 @@ HandleWin:
     xor al, al
     rep stosb
 
+WaitForEnterr:
+    xor ah, ah
+    int 16h                 ; Leer tecla del teclado
+    cmp al, 0Dh             ; Verificar si es Enter (código 0Dh)
+    jne WaitForEnterr        ; Si no es Enter, seguir esperando
+
     ;llamar a funcion que elige una nueva palabra random
 
-    jmp WaitForEnter
+    jmp WelcomeMenu
 
 GameEnd:
     xor ax, ax
