@@ -15,10 +15,12 @@ box_char_bot_r      db 217      ; ┘ (esquina inferior derecha redondeada)
 box_char_horiz      db 196      ; ─ (línea horizontal simple)
 box_char_vert       db 179      ; │ (línea vertical simple)
 dataDiv             db 10, 1
-words               db ' CASCO DEDAL JARRA PERRO GATOS PASTO LIBRO CARNE FUEGO METAL PUNTO TORRE PLAYA CAMPO NUBES RATON PERLA FANGO TAZAS VASOS BOLSA LENTE '
-                    db 'TECLA NARIZ CEJAS LABIO PELOS HUESO ROSTO BARBA BOTAS RUEDA MOTOR TUBOS CABLE VELAS NAVIO HORNO RADIO CELDA FOCO SILLA MESA BANCO '
-                    db 'CAJON PARED TECHO PUERTA SUELO MOLDE TROPA GRUPO FLETE BARCO AVION FICHA DADOS CARTA FONDO LUCES PERNO CLAVO TAPON MARCO GRANO FRUTA '
-                    db 'PANES TAZON JUEGO CUERO PULSO GENIO HABLA RITMO PASOS RAMAS HOJAS TINTA LLAVE COSTA RISCO ARENA TRIGO HUEVO PUNTA GARRA ROCA SUENO '
+general             db ' CASCO DEDAL JARRA PERRO GATOS PASTO LIBRO CARNE FUEGO METAL PUNTO TORRE PLAYA CAMPO NUBES '
+                    db 'TECLA NARIZ CEJAS LABIO PELOS HUESO ROSTO BARBA BOTAS RUEDA MOTOR TUBOS CABLE VELAS NAVIO '
+paises              db ' CHILE JAPON CHINA INDIA RUSIA SUIZA SIRIA QATAR NEPAL SAMOA TONGA YEMEN GHANA KENIA LIBIA '
+                    db 'RUSIA SUIZA SIRIA QATAR NEPAL SAMOA TONGA YEMEN GHANA KENIA LIBIA TUNEZ SUDAN COREA PAPUA '
+comidas             db ' PIZZA PASTA TACOS SUSHI RAMEN CURRY POLLO CARNE CERDO SOPAS FLANS TORTA QUESO JAMON PERAS '
+                    db 'BUDIN LIMON KIWIS MELON FRUTA VERDE ROJOS NEGRO DULCE SALADO AMARGO ACIDO SUAVE DUROS FRIOS '
 
 
 ; Arte ASCII para letras grandes estilo contorno (5x11 cada una, 55 bytes)
@@ -48,21 +50,32 @@ public RenderGuessRow
 public DrawBigText
 public r2a
 public PickRandomWord
+public general
+public paises
+public comidas
 
 PickRandomWord proc near
-
+    ; Entrada: BX = offset de la categoría (general, paises, o comidas)
+    ;          DI = offset de targetWord
+    ;          SI = offset de targetWordDisplay
+    ; Salida:  CX = cantidad de caracteres de la palabra
+    
     push ax
-    push bx
+    push dx
+    
+    ; Guardar offset de categoría en DX
+    mov dx, bx
+    
     ;devuelve en cx el largo de la palabra para despues cuando hagamos palabras con distintos largos
-    call Random1to100
+    call Random1to30
 
-    ;eln ax tenog el num del 1 al 100
-    ;bucle que recorre palaras y cada vez q encuentra un espacio aumenta en 1
+    ;en ax tengo el num del 1 al 30 (cada categoría tiene 30 palabras)
+    ;bucle que recorre palabras y cada vez q encuentra un espacio aumenta en 1
     ;recibe en di offset palabra a adivinar
     ;recibe en si offset variable targetWordDisplay
     ;devuelve en cx cantidad de caracteres de la palabra
     
-    lea bx, words
+    mov bx, dx      ; Usar la categoría pasada como parámetro
     mov cx, 0
 recorrerWords:
     cmp byte ptr[bx], 20h
@@ -92,13 +105,13 @@ isWordLoop:
 
 endCopy:
 
-    pop bx
+    pop dx
     pop ax
     ret
 
 PickRandomWord endp
 
-Random1to100 proc near
+Random1to30 proc near
     push dx
     push cx
 
@@ -112,18 +125,18 @@ Random1to100 proc near
     xor ax, cx
     add ax, dx
 
-    ; Hacer modulo 100
-    mov bx, 100
+    ; Hacer modulo 30 (cada categoría tiene 30 palabras)
+    mov bx, 30
     xor dx, dx       ; limpiar DX para div
-    div bx           ; AX = AX / 100, DX = resto (0–99)
+    div bx           ; AX = AX / 30, DX = resto (0–29)
 
-    mov ax, dx       ; número 0 a 99
-    inc ax           ; ahora 1 a 100
+    mov ax, dx       ; número 0 a 29
+    inc ax           ; ahora 1 a 30
 
     pop cx
     pop dx
     ret
-Random1to100 endp
+Random1to30 endp
 
 ClearCenteredDollarString proc near
     push ax

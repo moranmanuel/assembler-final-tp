@@ -23,16 +23,24 @@ extrn r2a:near
 extrn ClearStringAt:near
 extrn ClearCenteredDollarString:near
 extrn PickRandomWord:near
+extrn general:byte
+extrn paises:byte
+extrn comidas:byte
 
 .data
 welcomeTitle        db 'Wordly$'
-welcomePrompt       db 'Presiona Enter para comenzar$'
+welcomePrompt       db 'Selecciona la categoria que quieras jugar:$'
 continuePrompt      db 'Presiona Enter para continuar$'
 attemptsPrompt      db 'Intentos restantes: $' 
 promptText          db 'Ingresa tu palabra para adivinar la escondida:$'
 promptHint          db '         $'
 successMsg          db 'Felicitaciones! Adivinaste la palabra.$'
 failMsg             db 'No acertaste. La palabra era: $'
+categoryPaises      db 'Paises$'
+categoryComidas     db 'Comidas$'
+categoryGeneral     db 'General$'
+arrow               db '->$'
+spaceArrow          db '  $'
 targetWord          db 10 dup (24h)
 targetWordDisplay   db 10 dup (24h)
 guessBuffer         db WORD_LEN dup (0)
@@ -41,6 +49,8 @@ historyWords        db MAX_ATTEMPTS * WORD_LEN dup (0)
 historyStatuses     db MAX_ATTEMPTS * WORD_LEN dup (0)
 attemptsLeft        db '00$'
 attemptCount        db 0
+selectedCategory    db 0              ; 0=Paises, 1=Comidas, 2=General
+categoryOffset      dw 0              ; Offset de la categoría seleccionada
 
 .code
 start:
@@ -62,21 +72,78 @@ WelcomeMenu:
     call DrawBigText
 
     lea si, welcomePrompt
-    mov bh, 13              ; Dos filas más abajo del título (10 + 2 + 1 = 13)
+    mov bh, 14              ; Dos filas más abajo del título
     mov ah, 0Fh
     call PrintCenteredDollarString
 
-pickWord:
-    mov di, offset targetWord
-    mov si, offset targetWordDisplay
-    call PickRandomWord
-    ; Esperar a que presione Enter
-WaitForEnter:
-    xor ah, ah
-    int 16h                 ; Leer tecla del teclado
-    cmp al, 0Dh             ; Verificar si es Enter (código 0Dh)
-    jne WaitForEnter        ; Si no es Enter, seguir esperando
+    ; Inicializar categoría seleccionada (0 = Paises)
+    mov byte ptr [selectedCategory], 0
 
+CategoryMenu:
+    ; Dibujar el menú de categorías
+    call DrawCategoryMenu
+    
+CategoryMenuLoop:
+    ; Leer tecla del teclado
+    xor ah, ah
+    int 16h
+    
+    ; Verificar si es Enter
+    cmp al, 0Dh
+    je CategorySelected
+    
+    ; Verificar si es flecha arriba (código 48h en AH)
+    cmp ah, 48h
+    je MoveUp
+    
+    ; Verificar si es flecha abajo (código 50h en AH)
+    cmp ah, 50h
+    je MoveDown
+    
+    ; Si no es ninguna tecla válida, volver a leer
+    jmp CategoryMenuLoop
+
+MoveUp:
+    ; Mover hacia arriba (decrementar selectedCategory)
+    cmp byte ptr [selectedCategory], 0
+    je CategoryMenuLoop     ; Ya está en la primera categoría
+    dec byte ptr [selectedCategory]
+    call DrawCategoryMenu
+    jmp CategoryMenuLoop
+
+MoveDown:
+    ; Mover hacia abajo (incrementar selectedCategory)
+    cmp byte ptr [selectedCategory], 2
+    je CategoryMenuLoop     ; Ya está en la última categoría
+    inc byte ptr [selectedCategory]
+    call DrawCategoryMenu
+    jmp CategoryMenuLoop
+
+CategorySelected:
+    ; Establecer el offset de la categoría seleccionada
+    mov al, [selectedCategory]
+    cmp al, 0
+    je SetPaises
+    cmp al, 1
+    je SetComidas
+    jmp SetGeneral
+
+SetPaises:
+    lea bx, paises
+    mov [categoryOffset], bx
+    jmp StartGame
+
+SetComidas:
+    lea bx, comidas
+    mov [categoryOffset], bx
+    jmp StartGame
+
+SetGeneral:
+    lea bx, general
+    mov [categoryOffset], bx
+    jmp StartGame
+
+StartGame:
     ; Limpiar pantalla y comenzar el juego
     mov al, 07h
     int 60h
@@ -90,6 +157,12 @@ WaitForEnter:
     mov bh, PROMPT_HINT_ROW
     mov ah, 0Fh
     call PrintCenteredDollarString
+
+    ; Seleccionar palabra aleatoria de la categoría elegida
+    mov di, offset targetWord
+    mov si, offset targetWordDisplay
+    mov bx, [categoryOffset]
+    call PickRandomWord
 
 GameLoop:
     ;calcular intentos restantes
@@ -354,6 +427,144 @@ WaitForEnterr:
     ;llamar a funcion que elige una nueva palabra random
 
     jmp WelcomeMenu
+
+DrawCategoryMenu proc near
+    ; Dibuja el menú de categorías con la flecha en la seleccionada
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    
+    ; Fila base para las categorías (después del welcomePrompt que está en fila 14)
+    ; Usar un registro temporal para la fila para no perder el valor
+    mov ch, 16              ; Primera categoría en fila 16
+    
+    ; Dibujar "Paises" (índice 0)
+    mov bh, ch             ; Establecer fila desde CH
+    mov dl, 0              ; Flag para saber si mostrar flecha
+    mov al, [selectedCategory]
+    cmp al, 0
+    jne DrawPaisesNoArrow
+    mov dl, 1              ; Mostrar flecha
+DrawPaisesNoArrow:
+    lea si, categoryPaises
+    mov ah, 0Fh
+    call DrawCategoryItem
+    
+    ; Dibujar "Comidas" (índice 1)
+    inc ch                 ; Siguiente fila
+    mov bh, ch             ; Establecer fila desde CH
+    mov dl, 0
+    mov al, [selectedCategory]
+    cmp al, 1
+    jne DrawComidasNoArrow
+    mov dl, 1
+DrawComidasNoArrow:
+    lea si, categoryComidas
+    mov ah, 0Fh
+    call DrawCategoryItem
+    
+    ; Dibujar "General" (índice 2)
+    inc ch                 ; Siguiente fila
+    mov bh, ch             ; Establecer fila desde CH
+    mov dl, 0
+    mov al, [selectedCategory]
+    cmp al, 2
+    jne DrawGeneralNoArrow
+    mov dl, 1
+DrawGeneralNoArrow:
+    lea si, categoryGeneral
+    mov ah, 0Fh
+    call DrawCategoryItem
+    
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+DrawCategoryMenu endp
+
+DrawCategoryItem proc near
+    ; Entrada: SI = offset del texto de la categoría
+    ;          BH = fila (DEBE preservarse)
+    ;          DL = 1 si mostrar flecha, 0 si no
+    ;          AH = atributo
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    
+    ; Guardar valores críticos ANTES de cualquier modificación
+    mov di, si             ; DI = offset del texto
+    mov ch, bh             ; CH = fila (CRÍTICO - preservar)
+    mov cl, ah             ; CL = atributo (preservar)
+    push dx                ; Guardar flag de flecha (DL) en la pila
+    push cx                ; Guardar CX completo (CH y CL) en la pila
+    
+    ; Contar longitud del texto
+    mov si, di
+    xor cx, cx
+    
+CountCategoryLen:
+    lodsb
+    cmp al, '$'
+    je CategoryLenDone
+    inc cx
+    jmp CountCategoryLen
+    
+CategoryLenDone:
+    ; Guardar longitud en BX antes de restaurar CX
+    mov bx, cx             ; BX = longitud del texto (preservar)
+    
+    ; Restaurar valores críticos desde la pila (orden inverso al push)
+    pop cx                 ; Restaurar CX (CH = fila, CL = atributo)
+    pop dx                 ; Restaurar flag de flecha (DL)
+    
+    ; Calcular columna centrada: (80 - (longitud_texto + 3)) / 2
+    push dx                ; Guardar flag de flecha temporalmente
+    mov ax, bx             ; AX = longitud del texto (desde BX)
+    add ax, 3              ; Agregar "-> "
+    mov dx, 80
+    sub dx, ax
+    shr dx, 1              ; DX = columna inicial
+    mov bl, dl             ; BL = columna inicial
+    mov bh, ch             ; BH = fila (desde CH - CRÍTICO)
+    mov ah, cl             ; AH = atributo (desde CL)
+    pop dx                 ; Restaurar flag de flecha (DL)
+    
+    ; Dibujar flecha o espacios
+    cmp dl, 1
+    jne NoArrow
+    lea si, arrow
+    mov bh, ch             ; Asegurar que BH tiene la fila correcta
+    call PrintDollarStringAt
+    inc bl                 ; Espacio después de la flecha
+    jmp DrawCategoryText
+    
+NoArrow:
+    lea si, spaceArrow
+    mov bh, ch             ; Asegurar que BH tiene la fila correcta
+    call PrintDollarStringAt
+    inc bl                 ; Espacio después de los espacios
+    
+DrawCategoryText:
+    ; Dibujar el texto de la categoría
+    mov si, di             ; Restaurar SI desde DI
+    mov bh, ch             ; CRÍTICO: restaurar BH desde CH antes de llamar
+    call PrintDollarStringAt
+    
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+DrawCategoryItem endp
 
 GameEnd:
     xor ax, ax
