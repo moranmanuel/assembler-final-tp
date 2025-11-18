@@ -20,6 +20,8 @@ paises              db 'paises.txt',0
 comidas             db 'comidas.txt',0
 bytesRead           dw 0
 buffer              db 1000 dup(0) ;guarda el txt
+prueba              db 'PRUEBA'
+wordLen             db 0
 
 
 ; Arte ASCII para letras grandes estilo contorno (5x11 cada una, 55 bytes)
@@ -216,6 +218,7 @@ isWordLoop:
 
 endCopy:
 
+listoPrueba:
     pop dx
     pop ax
     ret
@@ -516,8 +519,11 @@ DrawGuessSlots proc near
     push cx
     push dx
 
+    mov wordLen, cl
+
     mov [render_base_column], bl
-    mov cx, 5
+    mov cl, wordLen           ;cambiar
+    xor ch, ch
     mov dh, bh          ; Guardar fila base
     mov dl, ah          ; Guardar atributo
 
@@ -548,12 +554,15 @@ ReadWord proc near
     push si
     push di
 
+    mov wordLen, cl
+
     mov [rw_base_column], dl
     mov [rw_letter_attr], ah
     mov [rw_base_row], dh
     mov di, bx
 
-    mov cx, 5
+    mov cl, wordLen
+    xor ch, ch   ;cambiar
     mov si, di
     xor al, al
 
@@ -575,7 +584,7 @@ ReadLoop:
     jnb ReadLoopContinue1
     jmp InvalidKey
 ReadLoopContinue1:
-    cmp cx, 5
+    cmp cl, wordLen       ;cambiar
     jae ReadLoop
 
     cmp al, 'a'
@@ -612,7 +621,7 @@ CheckUpperDone:
     call DrawBox
 
     inc cx
-    cmp cx, 5
+    cmp cl, wordLen       ;cambiar
     je ReadDone
     jmp ReadLoop
 
@@ -661,9 +670,12 @@ EvaluateGuess proc near
     mov bp, bx
     mov dx, si
 
+    mov wordLen, cl
+
     mov si, di
     mov di, offset tempTarget
-    mov cx, 5
+    mov cl, wordLen         ;cambiar
+    xor ch, ch       
 CopyTarget:
     mov al, [si]
     mov [di], al
@@ -671,7 +683,8 @@ CopyTarget:
     inc di
     loop CopyTarget
 
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
     mov di, bp
     xor al, al
 ZeroStatuses:
@@ -682,7 +695,8 @@ ZeroStatuses:
     mov si, dx
     mov di, offset tempTarget
     mov bx, bp
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
 FirstPass:
     mov al, [si]
     mov ah, [di]
@@ -698,13 +712,15 @@ FirstNext:
 
     mov si, dx
     mov bx, bp
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
 SecondPass:
     mov al, [si]
     cmp byte ptr [bx], 0
     jne SkipSecond
     mov di, offset tempTarget
-    mov dx, 5
+    mov dl, wordLen       ;cambiar
+    xor dh, dh
 SearchLoop:
     cmp al, [di]
     jne ContinueSearch
@@ -738,8 +754,11 @@ RenderGuessRow proc near
     push si
     push di
 
+    mov wordLen, cl 
+
     mov [render_base_column], dl
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
 
 RenderLoop:
     mov al, [si]
