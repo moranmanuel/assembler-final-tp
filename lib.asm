@@ -15,7 +15,7 @@ box_char_bot_r      db 217      ; ┘ (esquina inferior derecha redondeada)
 box_char_horiz      db 196      ; ─ (línea horizontal simple)
 box_char_vert       db 179      ; │ (línea vertical simple)
 dataDiv             db 10, 1
-general             db 'general.txt',0
+general             db 'general.txt',0 ;los txt tienen que tener un espacio al principio y al final
 paises              db 'paises.txt',0
 comidas             db 'comidas.txt',0
 bytesRead           dw 0
@@ -59,6 +59,7 @@ readFile proc near
     push cx
     push dx
     push di
+    push si
 
     ;recibe en dx offset filename
 
@@ -76,12 +77,15 @@ readFile proc near
     int 21h
     jc file_error
     mov bytesRead, ax ; Guardar cantidad de bytes leídos
+    mov si, ax
+    mov buffer[si], 0
 
     ; --- Cerrar archivo ---
     mov ah, 3Eh      ; Función DOS: cerrar archivo
     int 21h
 
 file_error:
+    pop si
     pop di
     pop dx
     pop cx
@@ -103,10 +107,10 @@ PickRandomWord proc near
 
     ;limpiar buffer
 
-    mov dx, offset paises
+    mov dx, bx
     call readFile
+
     ;ahora las palabras estan guardadas en buffer
-    
     ;funcion que cuenta las palabras
     mov si, offset buffer
     call CountWords
@@ -160,23 +164,28 @@ endCopy:
 PickRandomWord endp
 
 CountWords proc
-    ;pasar po si offset cadena
+    push bx
+    push cx
+    ;pasar por si offset cadena
     ;devuelve natidad de palabras en ax
     ;las palabras tienen q estar separadas por un espacio y el primer caracter tiene que ser un espacio tambien
     xor ax, ax        ; AX = contador de palabras
     mov bx, si        ; BX = puntero a cadena
 CountLoopp:
-    mov al, [bx]      ; leer un caracter
-    cmp al, 0         ; si es fin de cadena (NULL), salir
+    mov cl, [bx]      ; leer un caracter
+    cmp cl, 0         ; si es fin de cadena (NULL), salir
     je Done
-    cmp al, ' '       ; si es un espacio, aumentar contador
+    cmp cl, ' '       ; si es un espacio, aumentar contador
     jne NextCharr
     inc ax            ; contar palabra
 NextCharr:
     inc bx
     jmp CountLoopp
 Done:
+
     dec ax ;cuenta una de mas porque al final de la cadena hay un espacio
+    pop cx
+    pop bx
     ret
 CountWords endp
 
@@ -189,7 +198,7 @@ Random1ToN proc
     ; --- Semilla simple: segundos del reloj ---
     mov ah, 2Ch
     int 21h
-    mov al, ch        ; usar segundos (0..59)
+    mov al, dl        ; usar segundos (0..59)
     mov ah, 0
     mov dx, ax        ; DX = semilla
 
