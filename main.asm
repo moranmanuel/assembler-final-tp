@@ -43,7 +43,7 @@ promptText          db 'Ingresa tu palabra para adivinar la escondida:$'
 promptHint          db '         $'
 successMsg          db 'Felicitaciones! Adivinaste la palabra.$'
 failMsg             db 'No acertaste. La palabra era: $'
-categoryPaises      db 'Paises$', 0
+categoryPaises      db 'Lugares$', 0
 categoryComidas     db 'Comidas$', 0
 categoryGeneral     db 'General$', 0
 arrow               db '->$'
