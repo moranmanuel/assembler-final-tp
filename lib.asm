@@ -156,6 +156,49 @@ file_error:
     ; Manejo de error
 readFile endp
 
+readFile proc near
+
+    push ax
+    push bx
+    push cx
+    push dx
+    push di
+    push si
+
+    ;recibe en dx offset filename
+
+    ; --- Abrir archivo para lectura ---
+    mov ah, 3Dh      ; Función DOS: abrir archivo
+    mov al, 0        ; Modo: lectura
+    int 21h
+    jc  file_error   
+    mov bx, ax       ; BX = handle del archivo
+
+    ; --- Leer archivo ---
+    mov ah, 3Fh      ; Función DOS: leer archivo
+    mov cx, 1000      ; Cantidad de bytes a leer
+    lea dx, buffer   ; Dirección del buffer
+    int 21h
+    jc file_error
+    mov bytesRead, ax ; Guardar cantidad de bytes leídos
+    mov si, ax
+    mov buffer[si], 0
+
+    ; --- Cerrar archivo ---
+    mov ah, 3Eh      ; Función DOS: cerrar archivo
+    int 21h
+
+file_error:
+    pop si
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+    ; Manejo de error
+readFile endp
+
 PickRandomWord proc near
     ; Entrada: BX = offset de la categoría (general, paises, o comidas)
     ;          DI = offset de targetWord
@@ -254,6 +297,37 @@ CountWords endp
 Random1ToN proc
     ;pasar en bx max num
     ;devuelve en ax num random
+    push dx
+    push cx
+
+    ; --- Semilla simple: segundos del reloj ---
+    mov ah, 2Ch
+    int 21h
+    mov al, dl        ; usar segundos (0..59)
+    mov ah, 0
+    mov dx, ax        ; DX = semilla
+
+    ; --- Generar pseudoaleatorio simple ---
+    ; AX = (semilla * 3 + 7) mod 65536
+    mov ax, dx
+    mov cx, 3
+    mul cx            ; AX * 3
+    add ax, 7         ; sumamos constante
+    ; ahora AX = pseudoaleatorio 0..65535
+
+    ; --- Ajustar al rango 1..N ---
+    mov cx, bx
+    xor dx, dx
+    div cx            ; AX / N -> DX = residuo 0..N-1
+    mov ax, dx
+    inc ax            ; 1..N
+
+    pop cx
+    pop dx
+    ret
+Random1ToN endp
+
+Random1to30 proc near
     push dx
     push cx
 

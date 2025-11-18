@@ -1,9 +1,15 @@
 
  Start  Stop   Length Name               Class
 
+<<<<<<< HEAD
  00000H 00812H 00813H _TEXT              CODE
  00814H 00F97H 00784H _DATA              DATA
  00FA0H 0149FH 00500H STACK              STACK
+=======
+ 00000H 00741H 00742H _TEXT              CODE
+ 00742H 00E20H 006DFH _DATA              DATA
+ 00E30H 0132FH 00500H STACK              STACK
+>>>>>>> develop
 
 Program entry point at 0000:0000
 
