@@ -608,7 +608,7 @@ CategoryLenDone:
     push dx                ; Guardar flag de flecha temporalmente
     mov ax, bx             ; AX = longitud del texto (desde BX)
     add ax, 3              ; Agregar "-> "
-    mov dx, 80
+    mov dx, 74
     sub dx, ax
     shr dx, 1              ; DX = columna inicial
     mov bl, dl             ; BL = columna inicial
