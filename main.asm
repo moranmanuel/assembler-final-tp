@@ -2,7 +2,7 @@
 .stack 100h
 
 MAX_ATTEMPTS     EQU 15
-WORD_LEN         EQU 5
+WORD_LEN         EQU 9
 PROMPT_ROW       EQU 3        ; Movido más arriba para dar más espacio
 INPUT_ROW        EQU 5        ; Movido más abajo para dar más espacio al historial
 HISTORY_BASE_ROW EQU INPUT_ROW + 3       ; Fila más baja del historial (palabras nuevas aquí)
@@ -54,6 +54,7 @@ attemptsLeft        db '00$'
 attemptCount        db 0
 selectedCategory    db 0              ; 0=Paises, 1=Comidas, 2=General
 categoryOffset      dw 0              ; Offset de la categoría seleccionada
+wordLen             db 0
 
 .code
 start:
@@ -182,8 +183,9 @@ StartGame:
     mov si, offset targetWordDisplay
     mov bx, [categoryOffset]
     call PickRandomWord
-    
-
+    ;guardo largo de la palabra
+    mov wordLen, cl
+    xor ch, ch
 GameLoop:
     ;calcular intentos restantes
     mov al, MAX_ATTEMPTS
@@ -202,28 +204,34 @@ GameLoop:
     mov ah, 0Fh
     call PrintDollarStringAt
 
-
+    mov al, wordLen
     int 80h
     mov bl, al              ; Columna centrada en BL
     mov bh, INPUT_ROW
     mov ah, 0Fh
-    call DrawGuessSlots
+    mov cl, wordLen
+    call DrawGuessSlots     ;cambiar pasar largo de palabra
 
+    mov al, wordLen
     int 80h
     mov dl, al              ; Columna centrada en DL
     lea bx, guessBuffer
     mov dh, INPUT_ROW
     mov ah, 1Fh
-    call ReadWord
+    mov cl, wordLen
+    xor ch, ch
+    call ReadWord       ;cambiar pasar wordLen
 
     lea si, guessBuffer
     lea di, targetWord
     lea bx, statusBuffer
+    mov cl, wordLen
+    xor ch, ch
     call EvaluateGuess
 
     mov al, attemptCount
     xor ah, ah
-    mov bl, WORD_LEN
+    mov bl, wordLen
     mul bl
     mov dx, ax
 
@@ -232,13 +240,15 @@ GameLoop:
     lea si, guessBuffer
     lea di, historyWords
     add di, dx
-    mov cx, WORD_LEN
+    mov cl, wordLen
+    xor ch, ch
     rep movsb
 
     lea si, statusBuffer
     lea di, historyStatuses
     add di, dx
-    mov cx, WORD_LEN
+    mov cl, wordLen
+    xor ch, ch
     rep movsb
 
     ; Redibujar todo el historial para simular el scroll
@@ -258,7 +268,7 @@ RenderHistoryLoop:
     sub al, bl          ; attemptCount - índice = posición en el historial
     xor ah, ah
     push bx             ; Guardar índice
-    mov bl, WORD_LEN
+    mov bl, wordLen
     mul bl
     mov dx, ax
     pop bx              ; Restaurar índice
@@ -279,8 +289,11 @@ RenderHistoryLoop:
     add dh, al          ; Restar para que las nuevas estén abajo
     pop bx              ; Restaurar índice
     
+    mov al, wordLen
     int 80h
     mov dl, al
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
     call RenderGuessRow
     
     pop bx
@@ -288,7 +301,8 @@ RenderHistoryLoop:
     inc bx              ; Siguiente palabra (más vieja)
     loop RenderHistoryLoop
 
-    mov cx, WORD_LEN
+    mov cl, wordLen
+    xor ch, ch
     lea si, statusBuffer
 CheckWinLoop:
     cmp byte ptr [si], 2

@@ -24,7 +24,7 @@ Funcion PROC FAR
     push cx
     
     ; Ancho total: 5 recuadros × 6 caracteres - 1 espacio del último = 29
-    mov al, 5           ; Número de recuadros
+    ;mov al, 5           ; Número de recuadros
     mov bl, 6           ; Ancho por recuadro (5 caracteres + 1 espacio)
     mul bl              ; AX = 5 × 6 = 30
     sub ax, 1           ; Restar 1 espacio del último recuadro = 29
