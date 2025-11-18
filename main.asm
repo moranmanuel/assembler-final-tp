@@ -23,7 +23,7 @@ extrn r2a:near
 extrn ClearStringAt:near
 extrn ClearCenteredDollarString:near
 extrn PickRandomWord:near
-extrn drawFooter:near
+extrn drawRedFooter:near
 extrn general:byte
 extrn paises:byte
 extrn comidas:byte
@@ -182,6 +182,7 @@ StartGame:
     mov si, offset targetWordDisplay
     mov bx, [categoryOffset]
     call PickRandomWord
+    
 
 GameLoop:
     ;calcular intentos restantes
@@ -304,7 +305,7 @@ NotWin:
     jmp ax                  ; Salto indirecto para evitar "out of range"
 
 GameOver:
-    call drawFooter
+    call drawRedFooter
 
     lea si, failMsg
     mov bh, 21
@@ -390,7 +391,7 @@ GameOver:
     jmp WelcomeMenu
 
 HandleWin:
-    call drawFooter
+    call drawRedFooter
 
     lea si, successMsg
     mov bh, 22

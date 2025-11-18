@@ -52,11 +52,10 @@ public PickRandomWord
 public general
 public paises
 public comidas
-public drawFooter
-public drawFooter
+public drawRedFooter
 
 
-drawFooter proc
+drawRedFooter proc
     ; Guarda los registros que se van a utilizar
     push cx
     push dx
@@ -85,18 +84,18 @@ bucle_fila:
 bucle_columna:
     ; El primer byte es el caracter (lo dejamos como espacio ' ')
     mov al, ' '         
-    mov es:[di], al     ; Escribe el espacio
-    inc di              ; Mueve a la posición del atributo
+    mov es:[di], al     
+    inc di              
 
     ; Escribir el atributo de color rojo
-    mov al, 4fh         ; Escribe el valor literal 4Fh (Fondo Rojo + Texto Blanco)
-    mov es:[di], al     ; Escribe el color rojo brillante
-    inc di              ; Mueve a la siguiente posición de carácter
+    mov al, 4fh         
+    mov es:[di], al     
+    inc di              
 
     loop bucle_columna  ; Repite para las 80 columnas
 
     inc dx              ; Siguiente fila
-    ; Comprobar si hemos pasado la última fila (fila 24)
+    
     cmp dx, 25          
     jl bucle_fila       ; Si no, continuamos con la siguiente fila
 
@@ -109,7 +108,7 @@ fin_dibujo_texto:
     pop cx
     ret                 ; Retorna de la función
 
-drawFooter endp
+drawRedFooter endp
 
 
 readFile proc near
