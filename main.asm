@@ -1,7 +1,7 @@
 .model small
 .stack 100h
 
-MAX_ATTEMPTS     EQU 5
+MAX_ATTEMPTS     EQU 15
 WORD_LEN         EQU 5
 PROMPT_ROW       EQU 3        ; Movido más arriba para dar más espacio
 INPUT_ROW        EQU 5        ; Movido más abajo para dar más espacio al historial
@@ -23,6 +23,7 @@ extrn r2a:near
 extrn ClearStringAt:near
 extrn ClearCenteredDollarString:near
 extrn PickRandomWord:near
+extrn drawFooter:near
 extrn general:byte
 extrn paises:byte
 extrn comidas:byte
@@ -31,7 +32,7 @@ extrn comidas:byte
 welcomeTitle        db 'Wordly$'
 welcomePrompt       db 'Selecciona la categoria que quieras jugar:$'
 continuePrompt      db 'Presiona Enter para continuar$'
-categoryText        db 'Categoria:       $' 
+categoryText        db 'Categoria:         $' 
 categoriesTable     dw categoryPaises, categoryComidas, categoryGeneral
 attemptsPrompt      db 'Intentos restantes: $' 
 promptText          db 'Ingresa tu palabra para adivinar la escondida:$'
@@ -199,11 +200,6 @@ GameLoop:
     mov bl, 50
     mov ah, 0Fh
     call PrintDollarStringAt
-    ;lea si, failMsg
-    ;mov bh, 21
-    ;mov bl columna
-    ;mov ah, 0Fh
-    ;call PrintCenteredDollarString
 
 
     int 80h
@@ -308,6 +304,8 @@ NotWin:
     jmp ax                  ; Salto indirecto para evitar "out of range"
 
 GameOver:
+    call drawFooter
+
     lea si, failMsg
     mov bh, 21
     mov ah, 0Fh
@@ -323,18 +321,29 @@ GameOver:
     mov ah, 0Fh
     call PrintCenteredDollarString
 
+    ;limpio prompt
+    lea si, promptText
+    mov bh, PROMPT_ROW
+    mov ah, 07h
+    call ClearCenteredDollarString
+
     ;limpio la cadena de intentos restantes
-    mov bh, 1
+    mov bh, 2
     mov ah, 07h
     lea si, attemptsPrompt
     call ClearCenteredDollarString
 
-    mov bh, 1
+    mov bh, 2
     mov bl, 50
     mov ah, 07h
     lea si, attemptsLeft
     call ClearStringAt
 
+    ;limpio la cadena de categorias
+    mov bh, 1
+    mov ah, 07h
+    lea si, categoryText
+    call ClearCenteredDollarString
 
     ; --- Resetear estado del juego ---
     ; Poner attemptCount = 0
@@ -381,6 +390,8 @@ GameOver:
     jmp WelcomeMenu
 
 HandleWin:
+    call drawFooter
+
     lea si, successMsg
     mov bh, 22
     mov ah, 0Fh
@@ -391,10 +402,28 @@ HandleWin:
     mov ah, 0Fh
     call PrintCenteredDollarString
 
-    ;limpio la cadena de intentos restantes
+    ;limpio la cadena de categorias
     mov bh, 1
     mov ah, 07h
+    lea si, categoryText
+    call ClearCenteredDollarString
+
+    ;limpio la cadena de intentos restantes
+    mov bh, 2
+    mov ah, 07h
     lea si, attemptsPrompt
+    call ClearCenteredDollarString
+
+    mov bh, 2
+    mov bl, 50
+    mov ah, 07h
+    lea si, attemptsLeft
+    call ClearStringAt
+
+    ;limpio prompt
+    lea si, promptText
+    mov bh, PROMPT_ROW
+    mov ah, 07h
     call ClearCenteredDollarString
 
     mov bh, 1
