@@ -16,7 +16,7 @@ box_char_horiz      db 196      ; ─ (línea horizontal simple)
 box_char_vert       db 179      ; │ (línea vertical simple)
 dataDiv             db 10, 1
 general             db 'general.txt',0 ;los txt tienen que tener un espacio al principio y al final
-paises              db 'paises.txt',0
+lugares             db 'lugares.txt',0
 comidas             db 'comidas.txt',0
 bytesRead           dw 0
 buffer              db 1000 dup(0) ;guarda el txt
@@ -52,7 +52,7 @@ public DrawBigText
 public r2a
 public PickRandomWord
 public general
-public paises
+public lugares
 public comidas
 public drawFooter
 public cleanVar
@@ -163,7 +163,7 @@ file_error:
 readFile endp
 
 PickRandomWord proc near
-    ; Entrada: BX = offset de la categoría (general, paises, o comidas)
+    ; Entrada: BX = offset de la categoría (general, lugares, o comidas)
     ;          DI = offset de targetWord
     ;          SI = offset de targetWordDisplay
     ; Salida:  CX = cantidad de caracteres de la palabra

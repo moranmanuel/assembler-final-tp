@@ -29,7 +29,7 @@ extrn drawFooter:near
 extrn cleanVar:near
 extrn clearTemp:near
 extrn general:byte
-extrn paises:byte
+extrn lugares:byte
 extrn comidas:byte
 
 .data
@@ -37,13 +37,13 @@ welcomeTitle        db 'Wordly$'
 welcomePrompt       db 'Selecciona la categoria que quieras jugar:$'
 continuePrompt      db 'Presiona Enter para continuar$'
 categoryText        db 'Categoria:         $' 
-categoriesTable     dw categoryPaises, categoryComidas, categoryGeneral
+categoriesTable     dw categoryLugares, categoryComidas, categoryGeneral
 attemptsPrompt      db 'Intentos restantes: $' 
 promptText          db 'Ingresa tu palabra para adivinar la escondida:$'
 promptHint          db '         $'
 successMsg          db 'Felicitaciones! Adivinaste la palabra.$'
 failMsg             db 'No acertaste. La palabra era: $'
-categoryPaises      db 'Lugares$', 0
+categoryLugares      db 'Lugares$', 0
 categoryComidas     db 'Comidas$', 0
 categoryGeneral     db 'General$', 0
 arrow               db '->$'
@@ -56,7 +56,7 @@ historyWords        db MAX_ATTEMPTS * WORD_LEN dup (0)
 historyStatuses     db MAX_ATTEMPTS * WORD_LEN dup (0)
 attemptsLeft        db '00$'
 attemptCount        db 0
-selectedCategory    db 0              ; 0=Paises, 1=Comidas, 2=General
+selectedCategory    db 0              ; 0=Lugares, 1=Comidas, 2=General
 categoryOffset      dw 0              ; Offset de la categoría seleccionada
 wordLen             db 0
 
@@ -84,7 +84,7 @@ WelcomeMenu:
     mov ah, 0Fh
     call PrintCenteredDollarString
 
-    ; Inicializar categoría seleccionada (0 = Paises)
+    ; Inicializar categoría seleccionada (0 = Lugares)
     mov byte ptr [selectedCategory], 0
 
 CategoryMenu:
@@ -131,13 +131,13 @@ CategorySelected:
     ; Establecer el offset de la categoría seleccionada
     mov al, [selectedCategory]
     cmp al, 0
-    je SetPaises
+    je SetLugares
     cmp al, 1
     je SetComidas
     jmp SetGeneral
 
-SetPaises:
-    lea bx, paises
+SetLugares:
+    lea bx, lugares
     mov [categoryOffset], bx
     jmp StartGame
 
@@ -520,15 +520,15 @@ DrawCategoryMenu proc near
     ; Usar un registro temporal para la fila para no perder el valor
     mov ch, 16              ; Primera categoría en fila 16
     
-    ; Dibujar "Paises" (índice 0)
+    ; Dibujar "Lugares" (índice 0)
     mov bh, ch             ; Establecer fila desde CH
     mov dl, 0              ; Flag para saber si mostrar flecha
     mov al, [selectedCategory]
     cmp al, 0
-    jne DrawPaisesNoArrow
+    jne DrawLugaresNoArrow
     mov dl, 1              ; Mostrar flecha
-DrawPaisesNoArrow:
-    lea si, categoryPaises
+DrawLugaresNoArrow:
+    lea si, categoryLugares
     mov ah, 0Fh
     call DrawCategoryItem
     
