@@ -2,7 +2,7 @@
 .stack
 
 .data
-tempTarget          db 5 dup (0)
+tempTarget          db 10 dup (0)
 rw_base_column      db 0
 rw_base_row         db 0
 rw_letter_attr      db 0
@@ -14,6 +14,15 @@ box_char_bot_l      db 192      ; └ (esquina inferior izquierda redondeada)
 box_char_bot_r      db 217      ; ┘ (esquina inferior derecha redondeada)
 box_char_horiz      db 196      ; ─ (línea horizontal simple)
 box_char_vert       db 179      ; │ (línea vertical simple)
+dataDiv             db 10, 1
+general             db 'general.txt',0 ;los txt tienen que tener un espacio al principio y al final
+lugares             db 'lugares.txt',0
+comidas             db 'comidas.txt',0
+bytesRead           dw 0
+buffer              db 1000 dup(0) ;guarda el txt
+wordLen             db 0
+att                 db 0
+
 
 ; Arte ASCII para letras grandes estilo contorno (5x11 cada una, 55 bytes)
 ; Usando _, -, | para crear solo los bordes/contornos
@@ -30,39 +39,330 @@ GREEN_ATTR  EQU 2Fh
 YELLOW_ATTR EQU 6Fh
 BASE_ATTR   EQU 0Fh
 
+public ClearStringAt
 public SetVideoModeText
-public ClearScreenAttr
 public PrintDollarStringAt
 public PrintCenteredDollarString
+public ClearCenteredDollarString
 public DrawGuessSlots
 public ReadWord
 public EvaluateGuess
 public RenderGuessRow
-public CalculateCenteredColumn
 public DrawBigText
+public r2a
+public PickRandomWord
+public general
+public lugares
+public comidas
+public drawFooter
+public cleanVar
+public clearTemp
+
+
+
+
+drawFooter proc
+    ; Guarda los registros que se van a utilizar
+    ;recibe atributo en al
+    push cx
+    push dx
+    push ax
+    push es
+    push di
+
+    mov att, al
+    ; Cargar la dirección base de la VRAM para modo texto B800h
+    mov ax, 0b800h
+    mov es, ax          ; es ahora apunta al segmento de memoria de video
+
+    mov dx, 20          ; dx = fila actual (empieza en la fila 20)
+
+bucle_fila:
+    ; Calcular el offset inicial de la fila: Fila * Ancho * 2 bytes/carácter
+    ; Offset = dx * 160
+    mov ax, dx          ; ax = Fila actual
+    mov bl, 2           ; Multiplicar por 2 (carácter + atributo)
+    mul bl              ; ax = Fila * 2
+    mov bl, 80          ; bl = Ancho de pantalla
+    mul bl              ; ax = Offset lineal de la fila
+    mov di, ax          ; di = Offset en es:[di]
+
+    mov cx, 80          ; cx = contador de columnas (80 iteraciones por fila)
+
+bucle_columna:
+    ; El primer byte es el caracter (lo dejamos como espacio ' ')
+    mov al, ' '         
+    mov es:[di], al     
+    inc di              
+
+    ; Escribir el atributo de color rojo
+    mov al, att        
+    mov es:[di], al     
+    inc di              
+
+    loop bucle_columna  ; Repite para las 80 columnas
+
+    inc dx              ; Siguiente fila
+    
+    cmp dx, 25          
+    jl bucle_fila       ; Si no, continuamos con la siguiente fila
+
+fin_dibujo_texto:
+    ; Restaura los registros originales antes de salir
+    pop di
+    pop es
+    pop ax
+    pop dx
+    pop cx
+    ret                 ; Retorna de la función
+
+drawFooter endp
+
+
+readFile proc near
+
+    push ax
+    push bx
+    push cx
+    push dx
+    push di
+    push si
+
+    ;recibe en dx offset filename
+
+    ; --- Abrir archivo para lectura ---
+    mov ah, 3Dh      ; Función DOS: abrir archivo
+    mov al, 0        ; Modo: lectura
+    int 21h
+    jc  file_error   
+    mov bx, ax       ; BX = handle del archivo
+
+    ; --- Leer archivo ---
+    mov ah, 3Fh      ; Función DOS: leer archivo
+    mov cx, 1000      ; Cantidad de bytes a leer
+    lea dx, buffer   ; Dirección del buffer
+    int 21h
+    jc file_error
+    mov bytesRead, ax ; Guardar cantidad de bytes leídos
+    mov si, ax
+    mov buffer[si], 0
+
+    ; --- Cerrar archivo ---
+    mov ah, 3Eh      ; Función DOS: cerrar archivo
+    int 21h
+
+file_error:
+    pop si
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+    ; Manejo de error
+readFile endp
+
+PickRandomWord proc near
+    ; Entrada: BX = offset de la categoría (general, lugares, o comidas)
+    ;          DI = offset de targetWord
+    ;          SI = offset de targetWordDisplay
+    ; Salida:  CX = cantidad de caracteres de la palabra
+    push ax
+    push dx
+    push di
+    push si
+
+    ;limpiar buffer
+
+    mov dx, bx
+    call readFile
+
+    ;ahora las palabras estan guardadas en buffer
+    ;funcion que cuenta las palabras
+    mov si, offset buffer
+    call CountWords
+    
+
+    mov bx, ax
+    call Random1ToN
+
+    ;en ax tengo el num del 1 al 30 (cada categoría tiene 30 palabras)
+    ;bucle que recorre palabras y cada vez q encuentra un espacio aumenta en 1
+    ;recibe en di offset palabra a adivinar
+    ;recibe en si offset variable targetWordDisplay
+    ;devuelve en cx cantidad de caracteres de la palabra
+    
+    mov bx, offset buffer      ; Usar la categoría pasada como parámetro
+    mov cx, 0
+    pop si
+    pop di
+recorrerWords:
+    cmp byte ptr[bx], 20h
+    je isSpace
+    inc bx
+    jmp recorrerWords
+    isSpace:
+    inc cx
+    cmp cx, ax
+    je isWord
+    inc bx
+    jmp recorrerWords
+
+isWord: ;copiar la palabra en la variable de destino
+    mov cx, 0
+isWordLoop:
+    inc bx
+    cmp byte ptr[bx], 20h
+    je endCopy
+    mov al, [bx]    ;muevo a al el caracter
+    mov [di], al  ;lo guardo en la variable   
+    mov [si], al
+    inc cx
+    inc di
+    inc si
+    jmp isWordLoop
+
+endCopy:
+
+listoPrueba:
+    pop dx
+    pop ax
+    ret
+
+PickRandomWord endp
+
+CountWords proc near
+    push bx
+    push cx
+    ;pasar por si offset cadena
+    ;devuelve natidad de palabras en ax
+    ;las palabras tienen q estar separadas por un espacio y el primer caracter tiene que ser un espacio tambien
+    xor ax, ax        ; AX = contador de palabras
+    mov bx, si        ; BX = puntero a cadena
+CountLoopp:
+    mov cl, [bx]      ; leer un caracter
+    cmp cl, 0         ; si es fin de cadena (NULL), salir
+    je Done
+    cmp cl, ' '       ; si es un espacio, aumentar contador
+    jne NextCharr
+    inc ax            ; contar palabra
+NextCharr:
+    inc bx
+    jmp CountLoopp
+Done:
+
+    dec ax ;cuenta una de mas porque al final de la cadena hay un espacio
+    pop cx
+    pop bx
+    ret
+CountWords endp
+
+Random1ToN proc
+    ;pasar en bx max num
+    ;devuelve en ax num random
+    push dx
+    push cx
+
+    ; --- Semilla simple: segundos del reloj ---
+    mov ah, 2Ch
+    int 21h
+    mov al, dl        ; usar segundos (0..59)
+    mov ah, 0
+    mov dx, ax        ; DX = semilla
+
+    ; --- Generar pseudoaleatorio simple ---
+    ; AX = (semilla * 3 + 7) mod 65536
+    mov ax, dx
+    mov cx, 3
+    mul cx            ; AX * 3
+    add ax, 7         ; sumamos constante
+    ; ahora AX = pseudoaleatorio 0..65535
+
+    ; --- Ajustar al rango 1..N ---
+    mov cx, bx
+    xor dx, dx
+    div cx            ; AX / N -> DX = residuo 0..N-1
+    mov ax, dx
+    inc ax            ; 1..N
+
+    pop cx
+    pop dx
+    ret
+Random1ToN endp
+
+
+
+ClearCenteredDollarString proc near
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+
+    ; Guardar BH y AH en DL/DH
+    mov dh, ah
+    mov dl, bh
+
+    ; Guardar puntero original en BX y contar longitud en CX
+    mov bx, si       ; BX <- puntero original
+    xor cx, cx
+
+CountLooop:
+    mov al, [si]     ; leer byte en SI sin usar LODSB (más controlable)
+    cmp al, '$'
+    je CountDone
+    inc cx
+    inc si
+    jmp CountLooop
+
+CountDone:
+    mov si, bx       ; restaurar puntero original en SI
+
+    ; Calcular columna inicial: (80 - longitud) / 2
+    mov ax, 50h      ; 0x50 = 80 columnas
+    sub ax, cx
+    shr ax, 1
+    mov bl, al       ; BL = columna inicial
+
+    ; Restaurar BH y AH desde DL/DH
+    mov bh, dl
+    mov ah, dh
+
+    ; Llamar a la rutina que imprime espacios por cada carácter ($-terminated)
+    call ClearStringAt
+
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+ClearCenteredDollarString endp
+
+
+ClearStringAt proc near
+    ; entrada:
+    ;  SI = dirección del string con '$'
+    ;  BH = fila
+    ;  BL = columna
+    ;  AH = atributo
+NextClear:
+    lodsb
+    cmp al, '$'
+    je EndClear
+    mov al, ' '        ; convertir cualquier carácter en espacio
+    call WriteCharAttr
+    inc bl
+    jmp NextClear
+EndClear:
+    ret
+ClearStringAt endp
 
 SetVideoModeText proc near
     mov ax, 0003h
     int 10h
     ret
 SetVideoModeText endp
-
-ClearScreenAttr proc near
-    push bx
-    push cx
-    push dx
-
-    mov bh, al
-    mov ax, 0600h
-    xor cx, cx
-    mov dx, 184Fh
-    int 10h
-
-    pop dx
-    pop cx
-    pop bx
-    ret
-ClearScreenAttr endp
 
 WriteCharAttr proc near
     push bx
@@ -227,8 +527,11 @@ DrawGuessSlots proc near
     push cx
     push dx
 
+    mov wordLen, cl
+
     mov [render_base_column], bl
-    mov cx, 5
+    mov cl, wordLen           ;cambiar
+    xor ch, ch
     mov dh, bh          ; Guardar fila base
     mov dl, ah          ; Guardar atributo
 
@@ -259,12 +562,15 @@ ReadWord proc near
     push si
     push di
 
+    mov wordLen, cl
+
     mov [rw_base_column], dl
     mov [rw_letter_attr], ah
     mov [rw_base_row], dh
     mov di, bx
 
-    mov cx, 5
+    mov cl, wordLen
+    xor ch, ch   ;cambiar
     mov si, di
     xor al, al
 
@@ -281,12 +587,12 @@ ReadLoop:
     cmp al, 08h
     je HandleBackspace
     cmp al, 0Dh
-    je ReadLoop
+    je handleEnter
     cmp al, ' '
     jnb ReadLoopContinue1
     jmp InvalidKey
 ReadLoopContinue1:
-    cmp cx, 5
+    cmp cl, wordLen       ;cambiar
     jae ReadLoop
 
     cmp al, 'a'
@@ -323,9 +629,10 @@ CheckUpperDone:
     call DrawBox
 
     inc cx
-    cmp cx, 5
-    je ReadDone
     jmp ReadLoop
+
+midJump:
+    jmp readLoop
 
 HandleBackspace:
     cmp cx, 0
@@ -344,9 +651,14 @@ HandleBackspace:
     add bl, al
     mov bh, [rw_base_row]
     mov al, ' '
-    mov ah, [rw_letter_attr]
+    mov ah, 0Fh
     call DrawBox
     jmp ReadLoop
+
+handleEnter:
+    cmp cl, wordLen
+    jne midJump
+    jmp ReadDone
 
 InvalidKey:
     jmp ReadLoop
@@ -372,9 +684,12 @@ EvaluateGuess proc near
     mov bp, bx
     mov dx, si
 
+    mov wordLen, cl
+
     mov si, di
     mov di, offset tempTarget
-    mov cx, 5
+    mov cl, wordLen         ;cambiar
+    xor ch, ch       
 CopyTarget:
     mov al, [si]
     mov [di], al
@@ -382,7 +697,8 @@ CopyTarget:
     inc di
     loop CopyTarget
 
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
     mov di, bp
     xor al, al
 ZeroStatuses:
@@ -393,7 +709,8 @@ ZeroStatuses:
     mov si, dx
     mov di, offset tempTarget
     mov bx, bp
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
 FirstPass:
     mov al, [si]
     mov ah, [di]
@@ -409,13 +726,15 @@ FirstNext:
 
     mov si, dx
     mov bx, bp
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
 SecondPass:
     mov al, [si]
     cmp byte ptr [bx], 0
     jne SkipSecond
     mov di, offset tempTarget
-    mov dx, 5
+    mov dl, wordLen       ;cambiar
+    xor dh, dh
 SearchLoop:
     cmp al, [di]
     jne ContinueSearch
@@ -449,8 +768,11 @@ RenderGuessRow proc near
     push si
     push di
 
+    mov wordLen, cl 
+
     mov [render_base_column], dl
-    mov cx, 5
+    mov cl, wordLen       ;cambiar
+    xor ch, ch
 
 RenderLoop:
     mov al, [si]
@@ -491,31 +813,6 @@ AttrReady:
     pop ax
     ret
 RenderGuessRow endp
-
-CalculateCenteredColumn proc near
-    ; Calcula la columna centrada para los recuadros
-    ; Cada recuadro ocupa 5 caracteres + 1 espacio = 6 caracteres
-    ; 5 recuadros × 6 = 30, pero el último no tiene espacio = 29 caracteres totales
-    ; Retorna en AL la columna inicial centrada
-    push bx
-    push cx
-    
-    ; Ancho total: 5 recuadros × 6 caracteres - 1 espacio del último = 29
-    mov al, 5           ; Número de recuadros
-    mov bl, 6           ; Ancho por recuadro (5 caracteres + 1 espacio)
-    mul bl              ; AX = 5 × 6 = 30
-    sub ax, 1           ; Restar 1 espacio del último recuadro = 29
-    
-    ; Calcular columna centrada: (80 - 29) / 2
-    mov bl, 50h         ; 80 columnas (50h)
-    sub bl, al          ; 80 - 29 = 51
-    mov al, bl
-    shr al, 1           ; Dividir por 2 = 25 (redondeado hacia abajo)
-    
-    pop cx
-    pop bx
-    ret
-CalculateCenteredColumn endp
 
 DrawBigText proc near
     ; Dibuja el título completo desde bigW de una vez
@@ -626,6 +923,81 @@ DrawLetterCol:
     ret
 DrawBigLetter endp
 
+r2a proc
+    ;recibe en al el numero a convertir
+    ;recibe en dx el offset de la variable en la que escribe el ascii
+    ;en dx queda guardado el offset de la variable para despues llamar al serivio 9
+    push ax
+    push cx
+    push bx
+    push dx
+    push si
+
+    ;limpiar variable ascii
+    mov cx, 2
+    mov bx, dx
+limpiar:
+    mov byte ptr[bx], 30h
+    inc bx
+    loop limpiar
+
+
+    mov ah, 0
+    mov cx, 2
+    mov bx, dx
+    mov si, 0
+reg2ascc:
+    mov dl, dataDiv[si]
+    div dl
+    cmp al, 0
+    je OneDigit
+    TwoDigits:
+    add [bx], al
+    mov al, ah
+    mov ah, 0
+    inc bx
+    inc si
+loop reg2ascc
+    jmp fin
+    OneDigit:
+        cmp cx, 1
+        je TwoDigits
+        add [bx], ah
+        inc bx
+        sub [bx], 16
+    fin:
+    
+    pop si
+    pop dx
+    pop bx
+    pop cx
+    pop ax
+ret
+r2a endp
+
+
+clearTemp proc near
+    mov bx, offset tempTarget
+    mov al, 0
+    call cleanVar
+clearTemp endp
+
+cleanVar proc near ;limpia la taretWord
+    ;recibe en bx offset variable
+    ;recibe en al char a colocar
+    push bx
+    push cx
+    mov cx, 10
+    
+cleanLoop:
+    mov [bx], al
+    inc bx
+loop cleanLoop
+
+    pop cx
+    pop bx
+    ret
+cleanVar endp
 end
 
 
