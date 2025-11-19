@@ -16,7 +16,7 @@ box_char_horiz      db 196      ; ─ (línea horizontal simple)
 box_char_vert       db 179      ; │ (línea vertical simple)
 dataDiv             db 10, 1
 general             db 'general.txt',0 ;los txt tienen que tener un espacio al principio y al final
-paises              db 'paises.txt',0
+lugares             db 'lugares.txt',0
 comidas             db 'comidas.txt',0
 bytesRead           dw 0
 buffer              db 1000 dup(0) ;guarda el txt
@@ -52,7 +52,7 @@ public DrawBigText
 public r2a
 public PickRandomWord
 public general
-public paises
+public lugares
 public comidas
 public drawFooter
 public cleanVar
@@ -163,7 +163,7 @@ file_error:
 readFile endp
 
 PickRandomWord proc near
-    ; Entrada: BX = offset de la categoría (general, paises, o comidas)
+    ; Entrada: BX = offset de la categoría (general, lugares, o comidas)
     ;          DI = offset de targetWord
     ;          SI = offset de targetWordDisplay
     ; Salida:  CX = cantidad de caracteres de la palabra
@@ -587,7 +587,7 @@ ReadLoop:
     cmp al, 08h
     je HandleBackspace
     cmp al, 0Dh
-    je ReadLoop
+    je handleEnter
     cmp al, ' '
     jnb ReadLoopContinue1
     jmp InvalidKey
@@ -629,9 +629,10 @@ CheckUpperDone:
     call DrawBox
 
     inc cx
-    cmp cl, wordLen       ;cambiar
-    je ReadDone
     jmp ReadLoop
+
+midJump:
+    jmp readLoop
 
 HandleBackspace:
     cmp cx, 0
@@ -650,9 +651,14 @@ HandleBackspace:
     add bl, al
     mov bh, [rw_base_row]
     mov al, ' '
-    mov ah, [rw_letter_attr]
+    mov ah, 0Fh
     call DrawBox
     jmp ReadLoop
+
+handleEnter:
+    cmp cl, wordLen
+    jne midJump
+    jmp ReadDone
 
 InvalidKey:
     jmp ReadLoop
@@ -943,21 +949,29 @@ limpiar:
 reg2ascc:
     mov dl, dataDiv[si]
     div dl
+    cmp al, 0
+    je OneDigit
+    TwoDigits:
     add [bx], al
     mov al, ah
     mov ah, 0
     inc bx
     inc si
 loop reg2ascc
-
+    jmp fin
+    OneDigit:
+        cmp cx, 1
+        je TwoDigits
+        add [bx], ah
+        inc bx
+        sub [bx], 16
+    fin:
+    
     pop si
     pop dx
     pop bx
     pop cx
     pop ax
-    
-
-
 ret
 r2a endp
 
