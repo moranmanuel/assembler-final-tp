@@ -168,7 +168,7 @@ StartGame:
     shl bx, 1                       ; BX = BX * 2 porque la tabla de categorias es un dw
     mov si, [categoriesTable + bx]  ; SI = puntero a la categoria
     mov bh, 1
-    mov bl, 42
+    mov bl, 41
     mov ah, 0Fh
     call PrintDollarStringAt
 
