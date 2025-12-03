@@ -1,6 +1,6 @@
 int60
 int80
-tasm %1
-tasm %2
-tlink %1 %2
-%1.exe
+tasm main
+tasm lib
+tlink main lib
+main.exe
